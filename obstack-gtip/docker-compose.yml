@@ -1,0 +1,79 @@
+version: '3.2'
+
+services:
+
+  otlp-collector:
+    image: otel/opentelemetry-collector
+    command: --config /otelcol.yaml
+    restart: unless-stopped
+    volumes:
+      - ./otlp-collector/otelcol.yaml:/otelcol.yaml
+    ports:
+      - 4317:4317    # otlp grpc
+      - 4318:4318    # otlp http
+    hostname: otelcol
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  prometheus:
+    image: "prom/prometheus:latest"
+    privileged: true
+    user: root
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/etc:/etc/prometheus
+      - ./data/prometheus:/prometheus/data
+    command:
+      - --web.enable-lifecycle
+      - --config.file=/etc/prometheus/prometheus.yml
+    hostname: prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  influxdb:
+    image: "influxdb:1.8"
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - 8086:8086
+      - 8088:8088
+    volumes:
+      - ./data/influxdb:/var/lib/influxdb
+    hostname: influxdb
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  tempo:
+    image: "grafana/tempo:latest"
+    command: -config.file=/tempo.yaml
+    restart: unless-stopped
+    # TODO: privileged?
+    privileged: true
+    ports:
+      - 3200:3200    # tempo
+    volumes:
+      - ./tempo/tempo.yaml:/tempo.yaml
+      - ./data/tempo:/tmp/tempo
+    hostname: tempo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: "grafana/grafana-oss:latest"
+    privileged: true
+    user: root
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana/conf:/etc/grafana
+      - ./data/grafana/data:/var/lib/grafana
+      - ./data/grafana/logs:/var/log/grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    hostname: grafana
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
